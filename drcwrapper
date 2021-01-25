@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#controllo quale sia il mio environment (Linux, Mac) perché cambia il base path dove è installato DRC
+# check the environment (Linux, Mac) to find base path where DRC is installed
 case "$(uname -s)" in
 
    Darwin)
@@ -39,7 +39,7 @@ function print_help {
  echo >&2
  echo "drc is intended to be used with 441000 Hz files but other frequency configuration files are provided but they aren't tested" >&2
  echo >&2
- echo "when exporting impulse response please be sure it is a signed integer 32 bit wav" >&2
+ echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
  echo "USAGE drcwrapper -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -p [...] -l [...] -u [...] -g [...] IMPULSE" >&2
  echo >&2
@@ -64,10 +64,11 @@ function evaluate_help {
  fi
 }
 
-#il primo parametro è il nome del file da creare
-#il secondo è la frequenza di campionamento
-#l'ultima riga del file deve essere la frequenza
-#di campionamento fratto 2
+
+# $1 is the filename to create
+# $2 is sampling rate
+# first row in the file must be 0
+# last row in the file must be sampling rate / 2
 function print_flat_file {
   touch $1
   echo -e "0 -30\n$(($2 / 2)) -30" >> $1
@@ -96,7 +97,7 @@ function set_operating_frequency {
 }
 
 
-#calculate using bc
+# calculate using bc
 function calculate_bc {
   echo $(echo "$1" | bc)
 }
@@ -112,7 +113,7 @@ function calculate_end_freq {
 }
 
 
-#calculate window taps from milliseconds
+# calculate window taps from milliseconds
 function calculate_window_taps {
   echo $(calculate_bc "$1 * $OPERATING_FREQUENCY / 500")
 }
@@ -146,7 +147,7 @@ case $NUM_ARGS in
 esac
 
 
-#ho messo alcuni parametri, posso creare la cartella di lavoro
+# some parameters are set so it is possible to create work directory
 mkdir $OUT_DIR
 
 
@@ -210,7 +211,7 @@ done
 shift $((OPTIND - 1))
 
 
-#gestisco il caso che non abbia una correzione per il microfono oppure non abbia impostato una curva target
+# handle cases where a microphone correction is not available or a target curve is not set
 if [ -z "$MIC_COMP_FILE" ]; then
   print_flat_file $DEFAULT_NAME_MIC_COMPENSATION_FILE $OPERATING_FREQUENCY
   MIC_COMP_FILE=$DEFAULT_NAME_MIC_COMPENSATION_FILE
@@ -234,7 +235,7 @@ DRC_OUTPUT_TEST_CONVOLUTION_FILE="${TEST_CONVOLUTION_PREFIX}_${OUTPUT_FILE}"
 DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
 
 
-# converto i file dal formato di uscita di REW (signed integer) ad un formato comprensibile per DRC (floating point 32 bit)
+# converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
 sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 $INPUT_FILE -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 $OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE
 
 DRC="drc --BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE --MCFilterType=M --MCPointsFile=$MIC_COMP_FILE --MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE --MPWindowExponent=$WINDOW_EXPONENT --EPWindowExponent=$WINDOW_EXPONENT --RTWindowExponent=$WINDOW_EXPONENT --MPLowerWindow=$LOWER_WINDOW_TAPS --MPUpperWindow=$UPPER_WINDOW_TAPS --EPLowerWindow=$EP_LOWER_WINDOW_TAPS --EPUpperWindow=$UPPER_WINDOW_TAPS --RTLowerWindow=$LOWER_WINDOW_TAPS --RTUpperWindow=$UPPER_WINDOW_TAPS --ISPETType=f --ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS --ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS --PLStartFreq=$START_FREQ --PLEndFreq=$END_FREQ --PSPointsFile=$TARGET_CURVE --PLMaxGain=$PEAK_LIMITING_MAX_GAIN --PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE --MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE --TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE $DRC_CONFIGURATION_FILE"
