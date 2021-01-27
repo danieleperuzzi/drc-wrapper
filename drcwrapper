@@ -52,7 +52,7 @@ function print_help {
  echo "-t	target curve" >&2
  echo "-s	lower end frequency that your speaker can reproduce" >&2
  echo "-e	higher end frequency that your speaker can reproduce" >&2
- echo "-g Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
+ echo "-g	Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
  echo "-p	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
  echo "-l	lower correction window in milliseconds" >&2
  echo "-u	upper correction window in milliseconds" >&2
