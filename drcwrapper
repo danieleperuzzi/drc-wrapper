@@ -43,7 +43,7 @@ function print_help {
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
- echo "USAGE drcwrapper -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -p [...] -l [...] -u [...] -g [...] IMPULSE" >&2
+ echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -p [...] -l [...] -u [...] -g [...] IMPULSE" >&2
  echo >&2
  echo "-b	impulse response bit depth. Default is 32" >&2
  echo "-f	operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
