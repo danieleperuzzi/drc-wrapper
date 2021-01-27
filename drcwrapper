@@ -47,7 +47,7 @@ function print_help {
  echo >&2
  echo "-b	impulse response bit depth. Default is 32" >&2
  echo "-f	operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
- echo "-c	DRC configuration preset (minimal, soft, normal, strong, extreme, insane, erb" >&2
+ echo "-c	DRC configuration preset (minimal, soft, normal, strong, extreme, insane, erb)" >&2
  echo "-m	mic compensation file" >&2
  echo "-t	target curve" >&2
  echo "-s	lower end frequency that your speaker can reproduce" >&2
