@@ -171,13 +171,13 @@ while getopts ":b:f:c:m:t:s:e:g:p:l:u:" OPTIONS; do
       TARGET_CURVE=$OPTARG
       ;;
     s)
-	  # Start frequency where the reference RMS level used for peak limiting is computed. Default value set to 100 Hz.
-	  # This value should be set typically to something like an octave above the minimum reproducible frequency of your speakers.
+      # Start frequency where the reference RMS level used for peak limiting is computed. Default value set to 100 Hz.
+      # This value should be set typically to something like an octave above the minimum reproducible frequency of your speakers.
       START_FREQ=$(calculate_start_freq $OPTARG)
       ;;
     e)
-	  # End frequency where the reference RMS level used for peak limiting is computed. Default value set to 10000 Hz.
-	  # This value should be set typically to something like an octave below the maximum reproducible frequency of your speakers.
+      # End frequency where the reference RMS level used for peak limiting is computed. Default value set to 10000 Hz.
+      # This value should be set typically to something like an octave below the maximum reproducible frequency of your speakers.
       END_FREQ=$(calculate_end_freq $OPTARG)
       ;;
     g)
