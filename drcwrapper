@@ -43,7 +43,7 @@ function print_help {
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
- echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -p [...] -l [...] -u [...] -g [...] IMPULSE" >&2
+ echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -g [...] -p [...] -l [...] -u [...] IMPULSE" >&2
  echo >&2
  echo "-b	impulse response bit depth. Default is 32" >&2
  echo "-f	operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
@@ -52,10 +52,10 @@ function print_help {
  echo "-t	target curve" >&2
  echo "-s	lower end frequency that your speaker can reproduce" >&2
  echo "-e	higher end frequency that your speaker can reproduce" >&2
+ echo "-g Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
  echo "-p	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
  echo "-l	lower correction window in milliseconds" >&2
  echo "-u	upper correction window in milliseconds" >&2
- echo "-g	Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
  echo >&2
 }
 
@@ -153,7 +153,7 @@ esac
 mkdir $OUT_DIR
 
 
-while getopts ":b:f:c:m:t:s:e:p:l:u:g:" OPTIONS; do
+while getopts ":b:f:c:m:t:s:e:g:p:l:u:" OPTIONS; do
   case $OPTIONS in
     b)
       IMPULSE_RESPONSE_BIT_DEPTH=$OPTARG
@@ -180,6 +180,9 @@ while getopts ":b:f:c:m:t:s:e:p:l:u:g:" OPTIONS; do
 	  # This value should be set typically to something like an octave below the maximum reproducible frequency of your speakers.
       END_FREQ=$(calculate_end_freq $OPTARG)
       ;;
+    g)
+      PEAK_LIMITING_MAX_GAIN=$OPTARG
+      ;;
     p)
       WINDOW_EXPONENT=$OPTARG
       ;;
@@ -191,9 +194,6 @@ while getopts ":b:f:c:m:t:s:e:p:l:u:g:" OPTIONS; do
       ;;
     u)
       UPPER_WINDOW_TAPS=$(calculate_window_taps $OPTARG)
-      ;;
-    g)
-      PEAK_LIMITING_MAX_GAIN=$OPTARG
       ;;
     :)
       echo "Error: option ${OPTARG} requires an argument"
@@ -239,7 +239,7 @@ DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CON
 # converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
 sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 $INPUT_FILE -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 $OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE
 
-DRC="drc --BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE --MCFilterType=M --MCPointsFile=$MIC_COMP_FILE --MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE --MPWindowExponent=$WINDOW_EXPONENT --EPWindowExponent=$WINDOW_EXPONENT --RTWindowExponent=$WINDOW_EXPONENT --MPLowerWindow=$LOWER_WINDOW_TAPS --MPUpperWindow=$UPPER_WINDOW_TAPS --EPLowerWindow=$EP_LOWER_WINDOW_TAPS --EPUpperWindow=$UPPER_WINDOW_TAPS --RTLowerWindow=$LOWER_WINDOW_TAPS --RTUpperWindow=$UPPER_WINDOW_TAPS --ISPETType=f --ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS --ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS --PLStartFreq=$START_FREQ --PLEndFreq=$END_FREQ --PSPointsFile=$TARGET_CURVE --PLMaxGain=$PEAK_LIMITING_MAX_GAIN --PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE --MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE --TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE $DRC_CONFIGURATION_FILE"
+DRC="drc --BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE --MCFilterType=M --MCPointsFile=$MIC_COMP_FILE --MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE --MPWindowExponent=$WINDOW_EXPONENT --EPWindowExponent=$WINDOW_EXPONENT --RTWindowExponent=$WINDOW_EXPONENT --MPLowerWindow=$LOWER_WINDOW_TAPS --MPUpperWindow=$UPPER_WINDOW_TAPS --EPLowerWindow=$EP_LOWER_WINDOW_TAPS --EPUpperWindow=$UPPER_WINDOW_TAPS --RTLowerWindow=$LOWER_WINDOW_TAPS --RTUpperWindow=$UPPER_WINDOW_TAPS --ISPETType=f --ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS --ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS --PLStartFreq=$START_FREQ --PLEndFreq=$END_FREQ --PLMaxGain=$PEAK_LIMITING_MAX_GAIN --PSPointsFile=$TARGET_CURVE --PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE --MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE --TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE $DRC_CONFIGURATION_FILE"
 
 echo "executing drc..."
 echo
