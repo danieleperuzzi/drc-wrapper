@@ -21,6 +21,7 @@ RAW_EXT=pcm
 DRC_EXT=drc
 DEFAULT_NAME_MIC_COMPENSATION_FILE=mic_compensation_file
 DEFAULT_NAME_TARGET_CURVE_FILE=target_curve_file
+DRC_CONFIGURATION_FREQUENCY_FOLDER=44.1\ kHz
 DRC_CONFIGURATION_FILE_PREFIX=erb
 DRC_CONFIGURATION_FILE_FREQUENCY=44.1
 IMPULSE_RESPONSE_RAW_FILE_SUFFIX=impulse_response_raw
@@ -39,7 +40,7 @@ PEAK_LIMITING_MAX_GAIN=2
 
 function print_help {
  echo >&2
- echo "drc is intended to be used with 441000 Hz files but other frequency configuration files are provided but they aren't tested" >&2
+ echo "drc is intended to be used with 44100 Hz files but other frequency configuration files are provided but they aren't tested" >&2
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
@@ -80,18 +81,22 @@ function print_flat_file {
 function set_operating_frequency {
   case $1 in
    "44100")
+       DRC_CONFIGURATION_FREQUENCY_FOLDER=44.1\ kHz
        DRC_CONFIGURATION_FILE_FREQUENCY=44.1
        OPERATING_FREQUENCY=44100
        ;;
    "48000")
+       DRC_CONFIGURATION_FREQUENCY_FOLDER=48.0\ kHz
        DRC_CONFIGURATION_FILE_FREQUENCY=48.0
        OPERATING_FREQUENCY=48000
        ;;
    "88200")
+       DRC_CONFIGURATION_FREQUENCY_FOLDER=88.2\ kHz
        DRC_CONFIGURATION_FILE_FREQUENCY=88.2
        OPERATING_FREQUENCY=88200
        ;;
    "96000")
+       DRC_CONFIGURATION_FREQUENCY_FOLDER=96.0\ kHz
        DRC_CONFIGURATION_FILE_FREQUENCY=96.0
        OPERATING_FREQUENCY=96000
        ;;
@@ -233,7 +238,7 @@ MIC_COMPENSATED_IMPULSE_RESPONSE_FILE="${FILENAME}_${MIC_COMPENSATED_IMPULSE_RES
 DRC_OUTPUT_FILE="${FILENAME}.${RAW_EXT}"
 DRC_OUTPUT_MINIMUM_PHASE_FILE="${FILENAME}_${MINIMUM_PHASE_SUFFIX}.${RAW_EXT}"
 DRC_OUTPUT_TEST_CONVOLUTION_FILE="${FILENAME}_${TEST_CONVOLUTION_SUFFIX}.${RAW_EXT}"
-DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
+DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FREQUENCY_FOLDER}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
 
 
 # converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
