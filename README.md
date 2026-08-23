@@ -21,6 +21,7 @@ for an easy analysis it is suggested to use REW software
 ## Dependencies
 * [DRC](http://drc-fir.sourceforge.net/)
 * sox
+* bc
 
 it is assumed that DRC is compiled and available in the standard PATH.
 
