@@ -1,4 +1,4 @@
-Package: drcwrapper
+Package: drc-wrapper
 Version: __DEB_VERSION__
 Section: sound
 Priority: optional

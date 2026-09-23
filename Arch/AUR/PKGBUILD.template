@@ -20,6 +20,7 @@ package() {
     
     # Install documentation
     install -Dm644 "${REPO_DIR}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "${REPO_DIR}/BUILD.md" "${pkgdir}/usr/share/doc/${pkgname}/BUILD.md"
     
     # Install license
     install -Dm644 "${REPO_DIR}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"

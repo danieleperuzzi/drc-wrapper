@@ -1,6 +1,6 @@
 # Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
 pkgname=drc-wrapper
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="A simple bash wrapper script to ease DRC (Digital Room Correction) tool usage"
 arch=('any')
@@ -17,6 +17,7 @@ package() {
     
     # Install documentation
     install -Dm644 "${srcdir}/${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "${srcdir}/${pkgname}/BUILD.md" "${pkgdir}/usr/share/doc/${pkgname}/BUILD.md"
     
     # Install license
     install -Dm644 "${srcdir}/${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
