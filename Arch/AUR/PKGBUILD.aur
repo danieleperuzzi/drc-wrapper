@@ -1,0 +1,23 @@
+# Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
+pkgname=drc-wrapper
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A simple bash wrapper script to ease DRC (Digital Room Correction) tool usage"
+arch=('any')
+url="https://github.com/danieleperuzzi/drc-wrapper"
+license=('Apache-2.0')
+depends=('drc' 'sox' 'bc' 'bash')
+makedepends=('git')
+source=("${pkgname}::git+https://github.com/danieleperuzzi/drc-wrapper.git#tag=v${pkgver}")
+sha256sums=('SKIP')
+
+package() {
+    # Install the main script
+    install -Dm755 "${srcdir}/${pkgname}/drcwrapper" "${pkgdir}/usr/bin/drcwrapper"
+    
+    # Install documentation
+    install -Dm644 "${srcdir}/${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    
+    # Install license
+    install -Dm644 "${srcdir}/${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

@@ -7,17 +7,20 @@ arch=('any')
 url="https://github.com/danieleperuzzi/drc-wrapper"
 license=('Apache-2.0')
 depends=('drc' 'sox' 'bc' 'bash')
-makedepends=('git')
-source=("${pkgname}::git+ssh://git@github.com/danieleperuzzi/drc-wrapper.git")
-sha256sums=('SKIP')
+makedepends=()
+source=()
+sha256sums=()
 
 package() {
+    # Reference the local repository root directory relative to build_arch_staging
+    local REPO_DIR="${startdir}/../.."
+
     # Install the main script
-    install -Dm755 "${srcdir}/${pkgname}/drcwrapper" "${pkgdir}/usr/bin/drcwrapper"
+    install -Dm755 "${REPO_DIR}/drcwrapper" "${pkgdir}/usr/bin/drcwrapper"
     
     # Install documentation
-    install -Dm644 "${srcdir}/${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "${REPO_DIR}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
     
     # Install license
-    install -Dm644 "${srcdir}/${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    install -Dm644 "${REPO_DIR}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

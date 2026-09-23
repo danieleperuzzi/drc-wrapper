@@ -11,6 +11,12 @@ fi
 
 VERSION="$1"
 BUILD_DIR="build_arch_staging"
+TEMPLATE_FILE="Arch/AUR/PKGBUILD.template"
+
+if [ ! -f "$TEMPLATE_FILE" ]; then
+  echo "Error: $TEMPLATE_FILE not found." >&2
+  exit 1
+fi
 
 # Clean up previous build directory and artifacts
 rm -rf "$BUILD_DIR"
@@ -21,14 +27,14 @@ echo "Preparing Arch Linux package build for version ${VERSION}..."
 mkdir -p "$BUILD_DIR"
 
 # Process PKGBUILD template and inject version number
-sed "s/__PKGVER__/${VERSION}/g" Arch/AUR/PKGBUILD.template > "$BUILD_DIR/PKGBUILD"
+sed "s/__PKGVER__/${VERSION}/g" "$TEMPLATE_FILE" > "$BUILD_DIR/PKGBUILD"
 
 # Enter staging directory and run makepkg
 cd "$BUILD_DIR"
 
 echo "Building Arch Linux package with makepkg..."
 # Use -c (clean) and -d (nodeps) to ignore dependency checks
-makepkg -cd --noextract --nodeps
+makepkg -cd --nodeps
 
 # Move generated package back to root directory
 mv drc-wrapper-*.pkg.tar.zst ../
