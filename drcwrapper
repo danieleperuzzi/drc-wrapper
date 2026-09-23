@@ -4,7 +4,7 @@
 case "$(uname -s)" in
 
    Darwin)
-     CONFIG_DIR="/usr/local/share/drc/config/44.1 kHz"
+     CONFIG_DIR="/usr/local/share/drc/config"
      ;;
 
    Linux)
@@ -28,8 +28,6 @@ IMPULSE_RESPONSE_RAW_FILE_SUFFIX=impulse_response_raw
 MIC_COMPENSATED_IMPULSE_RESPONSE_SUFFIX=mic_compensated_impulse_response
 MINIMUM_PHASE_SUFFIX=minimum_phase
 TEST_CONVOLUTION_SUFFIX=test_convolution
-OUT_DIR=out
-WAV_16_BIT_OUT_DIR=$OUT_DIR/wav
 
 IMPULSE_RESPONSE_BIT_DEPTH=32
 OPERATING_FREQUENCY=44100
@@ -37,6 +35,7 @@ A_FACTOR_EP_LOWER_WINDOW=24
 START_FREQ=20
 END_FREQ=20000
 PEAK_LIMITING_MAX_GAIN=2
+WINDOW_EXPONENT=1
 
 function print_help {
  echo >&2
@@ -44,7 +43,7 @@ function print_help {
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
- echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -g [...] -p [...] -l [...] -u [...] IMPULSE" >&2
+ echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -g [...] -p [...] -l [...] -u [...] -o [...] IMPULSE" >&2
  echo >&2
  echo "-b	impulse response bit depth. Default is 32" >&2
  echo "-f	operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
@@ -57,6 +56,7 @@ function print_help {
  echo "-p	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
  echo "-l	lower correction window in milliseconds" >&2
  echo "-u	upper correction window in milliseconds" >&2
+ echo "-o	add drcwrapper working directory" >&2
  echo >&2
 }
 
@@ -73,8 +73,7 @@ function evaluate_help {
 # first row in the file must be 0
 # last row in the file must be sampling rate / 2
 function print_flat_file {
-  touch $1
-  echo -e "0 -30\n$(($2 / 2)) -30" >> $1
+  printf "0 -30\n%d -30\n" "$(( $2 / 2 ))" > "$1"
 }
 
 
@@ -103,6 +102,16 @@ function set_operating_frequency {
   esac
 }
 
+
+# return current timestamp
+function timestamp() {
+  date +"%s" # current time+%s
+}
+
+# get a unique output directory name based on the current timestamp
+function get_unique_output_dir() {
+  echo "drc_out_$(timestamp)"
+}
 
 # calculate using bc
 function calculate_bc {
@@ -153,12 +162,8 @@ case $NUM_ARGS in
      ;;
 esac
 
-
-# some parameters are set so it is possible to create work directory
-mkdir $OUT_DIR
-
-
-while getopts ":b:f:c:m:t:s:e:g:p:l:u:" OPTIONS; do
+# parse command line options
+while getopts ":b:f:c:m:t:s:e:g:p:l:u:o:" OPTIONS; do
   case $OPTIONS in
     b)
       IMPULSE_RESPONSE_BIT_DEPTH=$OPTARG
@@ -200,6 +205,14 @@ while getopts ":b:f:c:m:t:s:e:g:p:l:u:" OPTIONS; do
     u)
       UPPER_WINDOW_TAPS=$(calculate_window_taps $OPTARG)
       ;;
+    o)
+      TARGET_PARENT="$OPTARG"
+
+      # create the target parent directory if it does not exist
+      if [ ! -d "$TARGET_PARENT" ]; then
+        mkdir -p "$TARGET_PARENT"
+      fi
+      ;;
     :)
       echo "Error: option ${OPTARG} requires an argument"
       echo
@@ -217,21 +230,50 @@ done
 
 shift $((OPTIND - 1))
 
+# check if the required parameters are set before proceeding
+
+# check if the required window taps are set
+if [ -z "$LOWER_WINDOW_TAPS" ] || [ -z "$UPPER_WINDOW_TAPS" ]; then
+  echo "Error: the required window taps are not set." >&2
+  exit 1
+fi
+
+# check if the input file is set
+INPUT_FILE=$1
+
+if [ -z "$INPUT_FILE" ]; then
+  echo "Error: missing input file parameter." >&2
+  print_help
+  exit 1
+fi
+
+# some parameters are set so it is possible to create working directory
+if [ -n "$TARGET_PARENT" ]; then
+  OUT_DIR="${TARGET_PARENT%/}/$(get_unique_output_dir)"
+else
+  OUT_DIR="$(get_unique_output_dir)"
+fi
+
+mkdir -p "$OUT_DIR"
+
+# create output directory for 16-bit WAV files
+WAV_16_BIT_OUT_DIR=$OUT_DIR/wav
+mkdir -p "$WAV_16_BIT_OUT_DIR"
 
 # handle cases where a microphone correction is not available or a target curve is not set
 if [ -z "$MIC_COMP_FILE" ]; then
-  print_flat_file $DEFAULT_NAME_MIC_COMPENSATION_FILE $OPERATING_FREQUENCY
-  MIC_COMP_FILE=$DEFAULT_NAME_MIC_COMPENSATION_FILE
+  MIC_COMP_FILE="$OUT_DIR/$DEFAULT_NAME_MIC_COMPENSATION_FILE"
+  print_flat_file "$MIC_COMP_FILE" "$OPERATING_FREQUENCY"
 fi
 
 if [ -z "$TARGET_CURVE" ]; then
-  print_flat_file $DEFAULT_NAME_TARGET_CURVE_FILE $OPERATING_FREQUENCY
-  TARGET_CURVE=$DEFAULT_NAME_TARGET_CURVE_FILE
+  TARGET_CURVE="$OUT_DIR/$DEFAULT_NAME_TARGET_CURVE_FILE"
+  print_flat_file "$TARGET_CURVE" "$OPERATING_FREQUENCY"
 fi
 
 
-INPUT_FILE=$1
-FILENAME=$(basename $INPUT_FILE | sed 's/\.[^.]*$//')
+# extract the filename without extension from the input file
+FILENAME=$(basename "$INPUT_FILE" | sed 's/\.[^.]*$//')
 
 IMPULSE_RESPONSE_RAW_FILE="${FILENAME}_${IMPULSE_RESPONSE_RAW_FILE_SUFFIX}.${RAW_EXT}"
 MIC_COMPENSATED_IMPULSE_RESPONSE_FILE="${FILENAME}_${MIC_COMPENSATED_IMPULSE_RESPONSE_SUFFIX}.${RAW_EXT}"
@@ -242,44 +284,44 @@ DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FREQUENCY_FOLDER}/${DR
 
 
 # converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
-sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 $INPUT_FILE -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 $OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE
+sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 "${INPUT_FILE}" -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "${OUT_DIR}/${IMPULSE_RESPONSE_RAW_FILE}"
 
-DRC="drc --BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE \
---MCFilterType=M \
---MCPointsFile=$MIC_COMP_FILE \
---MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE \
---MPWindowExponent=$WINDOW_EXPONENT \
---EPWindowExponent=$WINDOW_EXPONENT \
---RTWindowExponent=$WINDOW_EXPONENT \
---MPLowerWindow=$LOWER_WINDOW_TAPS \
---MPUpperWindow=$UPPER_WINDOW_TAPS \
---EPLowerWindow=$EP_LOWER_WINDOW_TAPS \
---EPUpperWindow=$UPPER_WINDOW_TAPS \
---RTLowerWindow=$LOWER_WINDOW_TAPS \
---RTUpperWindow=$UPPER_WINDOW_TAPS \
---ISPETType=f \
---ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS \
---ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS \
---PLStartFreq=$START_FREQ \
---PLEndFreq=$END_FREQ \
---PLMaxGain=$PEAK_LIMITING_MAX_GAIN \
---PSPointsFile=$TARGET_CURVE \
---PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE \
---MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE \
---TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE \
-\"$DRC_CONFIGURATION_FILE\""
+DRC_ARGS=(
+  "--BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
+  "--MCFilterType=M"
+  "--MCPointsFile=$MIC_COMP_FILE"
+  "--MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE"
+  "--MPWindowExponent=$WINDOW_EXPONENT"
+  "--EPWindowExponent=$WINDOW_EXPONENT"
+  "--RTWindowExponent=$WINDOW_EXPONENT"
+  "--MPLowerWindow=$LOWER_WINDOW_TAPS"
+  "--MPUpperWindow=$UPPER_WINDOW_TAPS"
+  "--EPLowerWindow=$EP_LOWER_WINDOW_TAPS"
+  "--EPUpperWindow=$UPPER_WINDOW_TAPS"
+  "--RTLowerWindow=$LOWER_WINDOW_TAPS"
+  "--RTUpperWindow=$UPPER_WINDOW_TAPS"
+  "--ISPETType=f"
+  "--ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS"
+  "--ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS"
+  "--PLStartFreq=$START_FREQ"
+  "--PLEndFreq=$END_FREQ"
+  "--PLMaxGain=$PEAK_LIMITING_MAX_GAIN"
+  "--PSPointsFile=$TARGET_CURVE"
+  "--PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE"
+  "--MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE"
+  "--TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE"
+  "$DRC_CONFIGURATION_FILE"
+)
 
 echo "executing drc..."
 echo
-echo $DRC
+echo "drc \"${DRC_ARGS[*]}\""
 echo
-eval $DRC
+drc "${DRC_ARGS[@]}"
 
 # check if drc command exited with 0 status
 if [ $? -eq 0 ]
 then
-	mkdir $WAV_16_BIT_OUT_DIR
-
 	DRC_OUTPUT_FILENAMES_ARRAY=($MIC_COMPENSATED_IMPULSE_RESPONSE_FILE $DRC_OUTPUT_FILE $DRC_OUTPUT_MINIMUM_PHASE_FILE $DRC_OUTPUT_TEST_CONVOLUTION_FILE)
 
 	for FILENAME in "${DRC_OUTPUT_FILENAMES_ARRAY[@]}"
@@ -288,10 +330,10 @@ then
 
 		# convert all drc output files into 16 bit wav
 		# REW better manages this kind of format
-		sox -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 $OUT_DIR/$FILENAME -t wav -e signed-integer -b 16 -r $OPERATING_FREQUENCY -c 1 $WAV_16_BIT_OUT_DIR/$WAV_FILENAME
+		sox -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$FILENAME" -t wav -e signed-integer -b 16 -r $OPERATING_FREQUENCY -c 1 "$WAV_16_BIT_OUT_DIR/$WAV_FILENAME"
 	done
 fi
 
 echo
 echo "cleaning..."
-rm $OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE
+rm "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
