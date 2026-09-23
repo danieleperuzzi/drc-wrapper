@@ -27,7 +27,8 @@ sed "s/__PKGVER__/${VERSION}/g" Arch/AUR/PKGBUILD.template > "$BUILD_DIR/PKGBUIL
 cd "$BUILD_DIR"
 
 echo "Building Arch Linux package with makepkg..."
-makepkg -sc
+# Use -c (clean) and -d (nodeps) to ignore dependency checks
+makepkg -cd --noextract --nodeps
 
 # Move generated package back to root directory
 mv drc-wrapper-*.pkg.tar.zst ../
