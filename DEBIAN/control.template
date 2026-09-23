@@ -1,0 +1,11 @@
+Package: drcwrapper
+Version: __DEB_VERSION__
+Section: sound
+Priority: optional
+Architecture: all
+Depends: bash, drc, sox, bc
+Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
+Description: Digital Room Correction (DRC) wrapper script
+ A CLI wrapper around Denis Sbragion's DRC tool. It automates window size
+ calculations, file format conversions via SoX, target curve fallback
+ generation, and output organizing for room correction processing.

@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        if [ -f /usr/local/bin/drcwrapper ]; then
+            chmod 755 /usr/local/bin/drcwrapper
+        fi
+        ;;
+    *)
+        ;;
+esac
+
+exit 0

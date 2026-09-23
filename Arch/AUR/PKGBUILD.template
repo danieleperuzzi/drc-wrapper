@@ -1,6 +1,6 @@
 # Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
 pkgname=drc-wrapper
-pkgver=1.0.0
+pkgver=__PKGVER__
 pkgrel=1
 pkgdesc="A simple bash wrapper script to ease DRC (Digital Room Correction) tool usage"
 arch=('any')
