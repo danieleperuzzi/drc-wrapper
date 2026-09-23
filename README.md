@@ -17,6 +17,10 @@ The original `drc` command involves complex configuration files and dozens of pa
 * Dynamic output directory generation based on timestamps to prevent accidental overwrites.
 * Generates test convolutions and minimum phase response filters for easy analysis in tools like REW (Room EQ Wizard).
 
+## Building & Packaging
+
+For instructions on how to build Debian (`.deb`) and Arch Linux (`.pkg.tar.zst`) packages locally or to understand how the automated GitHub Actions pipeline works, please refer to the dedicated [BUILD.md](BUILD.md) guide.
+
 ## Dependencies
 
 Before running the wrapper, ensure you have the following CLI tools installed and available in your standard system PATH:
