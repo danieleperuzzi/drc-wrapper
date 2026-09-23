@@ -12,8 +12,8 @@ source=()
 sha256sums=()
 
 package() {
-    # Reference the local repository root directory relative to build_arch_staging
-    local REPO_DIR="${startdir}/../.."
+    # Relies on current working directory inside build_arch_staging
+    local REPO_DIR="../.."
 
     # Install the main script
     install -Dm755 "${REPO_DIR}/drcwrapper" "${pkgdir}/usr/bin/drcwrapper"

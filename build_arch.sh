@@ -18,7 +18,7 @@ if [ ! -f "$TEMPLATE_FILE" ]; then
   exit 1
 fi
 
-# Clean up previous build directory and artifacts
+# Clean up previous build artifacts
 rm -rf "$BUILD_DIR"
 
 echo "Preparing Arch Linux package build for version ${VERSION}..."
