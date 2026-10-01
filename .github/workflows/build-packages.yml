@@ -1,125 +1,120 @@
-name: Build Packages
+name: Build and Release Packages
 
 on:
   push:
     branches:
-      - "**"
-  pull_request:
+      - main
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (e.g., 1.0.0)"
+        required: true
+        default: "1.0.0"
 
 jobs:
-  test:
+  build-deb:
+    name: Build Debian Package
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install test dependencies
+      - name: Determine Version
+        id: get_version
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm bash shellcheck drc sox bc
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="1.0.0-dev"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Bash syntax check
-        run: bash -n drcwrapper
+      - name: Make Build Script Executable
+        run: chmod +x build_deb.sh
 
-      - name: Shellcheck
-        run: shellcheck drcwrapper
+      - name: Build Debian Package
+        run: ./build_deb.sh "${{ steps.get_version.outputs.VERSION }}-1"
 
-      - name: Help smoke test
-        run: ./drcwrapper --help
-
-      - name: Real end-to-end execution
-        run: |
-          rm -rf out
-          ./drcwrapper \
-            --mic-compensation test/ecm8000-44.1KHz.txt \
-            --target-curve test/target_curve_file_flat \
-            --window-exponent 0.85 \
-            --lower-window 525 \
-            --upper-window 1 \
-            test/ImpulseLeft.wav
-
-      - name: Verify generated outputs
-        run: |
-          test -f out/wav/ImpulseLeft_mic_compensated_impulse_response.wav
-          test -f out/wav/ImpulseLeft.wav
-          test -f out/wav/ImpulseLeft_minimum_phase.wav
-          test -f out/wav/ImpulseLeft_test_convolution.wav
-
-  build-debian:
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Compute package version
-        id: version
-        run: |
-          VERSION="$(date +%Y.%m.%d)-${GITHUB_SHA::7}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Build .deb package
-        run: |
-          PKGROOT="build/deb/drc-wrapper"
-          VERSION="${{ steps.version.outputs.version }}"
-
-          rm -rf "$PKGROOT"
-          mkdir -p "$PKGROOT/DEBIAN"
-          mkdir -p "$PKGROOT/usr/bin"
-          mkdir -p "$PKGROOT/usr/share/doc/drc-wrapper"
-
-          install -m 755 drcwrapper "$PKGROOT/usr/bin/drcwrapper"
-          install -m 644 README.md "$PKGROOT/usr/share/doc/drc-wrapper/README.md"
-          install -m 644 LICENSE "$PKGROOT/usr/share/doc/drc-wrapper/LICENSE"
-
-          cat > "$PKGROOT/DEBIAN/control" << EOF
-          Package: drc-wrapper
-          Version: $VERSION
-          Section: sound
-          Priority: optional
-          Architecture: all
-          Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
-          Depends: bash, bc, sox, drc
-          Description: A simple bash wrapper script to ease DRC usage
-           Wrapper script around drc (Digital Room Correction).
-          EOF
-
-          dpkg-deb --build "$PKGROOT" "build/drc-wrapper_${VERSION}_all.deb"
-
-      - name: Upload Debian artifact
+      - name: Upload Debian Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: debian-package
-          path: build/*.deb
+          name: drcwrapper-debian-package
+          path: "*.deb"
+          retention-days: 7
 
   build-arch:
+    name: Build Arch Linux Package
     runs-on: ubuntu-latest
-    needs: test
     container:
       image: archlinux:latest
-
     steps:
-      - name: Install build dependencies
+      - name: Install Build Dependencies
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git
+          pacman -Syu --noconfirm base-devel git
 
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build Arch package
+      - name: Configure Safe Directory & Non-Root User
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           chown -R builder:builder "$GITHUB_WORKSPACE"
-          su builder -c "cd '$GITHUB_WORKSPACE/Arch/AUR' && makepkg --noconfirm --nodeps --cleanbuild"
 
-      - name: Upload Arch artifact
+      - name: Determine Version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="1.0.0.dev"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Make Build Script Executable
+        run: chmod +x build_arch.sh
+
+      - name: Build Arch Package as Non-Root User
+        run: |
+          su builder -c "./build_arch.sh ${{ steps.get_version.outputs.VERSION }}"
+
+      - name: Upload Arch Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arch-package
-          path: Arch/AUR/*.pkg.tar.*
+          name: drcwrapper-arch-package
+          path: "*.pkg.tar.zst"
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: [build-deb, build-arch]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Debian Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: drcwrapper-debian-package
+
+      - name: Download Arch Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: drcwrapper-arch-package
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.deb
+            *.pkg.tar.zst
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
