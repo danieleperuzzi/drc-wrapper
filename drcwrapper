@@ -56,6 +56,7 @@ function print_help {
  echo "-p, --window-exponent	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
  echo "-l, --lower-window	lower correction window in milliseconds" >&2
  echo "-u, --upper-window	upper correction window in milliseconds" >&2
+ echo "-o, --output-dir		add drcwrapper working directory" >&2
  echo "-h, --help		show this help" >&2
  echo >&2
 }
@@ -103,6 +104,13 @@ function timestamp() {
 # get a unique output directory name based on the current timestamp
 function get_unique_output_dir() {
   echo "drc_out_$(timestamp)"
+}
+
+function create_output_dir() {
+  # create the target parent directory if it does not exist
+  if [ ! -d "$1" ]; then
+    mkdir -p "$1"
+  fi
 }
 
 # calculate using bc
@@ -256,6 +264,17 @@ while [ $# -gt 0 ]; do
       ;;
     --upper-window=*)
       UPPER_WINDOW_TAPS=$(calculate_window_taps "${1#*=}")
+      shift
+      ;;
+    -o|--output-dir)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      TARGET_PARENT="$2"
+      create_output_dir "$TARGET_PARENT"
+      shift 2
+      ;;
+    --output-dir=*)
+      TARGET_PARENT="${1#*=}"
+      create_output_dir "$TARGET_PARENT"
       shift
       ;;
     -h|--help)

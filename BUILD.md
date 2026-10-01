@@ -1,127 +1,129 @@
-# Build & Packaging Guide
+# Build and Packaging Guide
 
-This document explains how to build Debian (`.deb`) and Arch Linux (`.pkg.tar.zst`) packages for `drcwrapper` both locally and via the automated GitHub Actions CI/CD pipeline.
+This guide explains how to build Debian (`.deb`) and Arch Linux (`.pkg.tar.zst`) packages locally and through GitHub Actions.
 
----
-
-## Directory Structure Overview
+## Current Structure
 
 ```text
 .
-├── .github/
-│   └── workflows/
-│       └── build-packages.yml # GitHub Actions workflow
-├── Arch/
-│   └── AUR/
-│       ├── PKGBUILD.template  # Template for local and CI/CD builds
-│       └── PKGBUILD.aur       # Template for official AUR releases
+├── .github/workflows/
+│   ├── test.yml
+│   └── build-packages.yml
+├── Arch/AUR/
+│   ├── PKGBUILD.template
+│   └── PKGBUILD.aur
 ├── DEBIAN/
-│   ├── control.template       # Control file template
-│   ├── postinst.template      # Post-installation hook
-│   └── postrm.template        # Post-removal hook
-├── build_arch.sh              # Local Arch Linux packaging script
-├── build_deb.sh               # Local Debian packaging script
-├── drcwrapper                 # Main wrapper executable
-├── LICENSE                    # Software license
-└── README.md                  # Project documentation
+│   ├── control.template
+│   ├── postinst
+│   └── postrm
+├── build_deb.sh
+├── build_arch.sh
+├── drcwrapper
+├── README.md
+└── BUILD.md
 ```
 
----
+## Local Build Requirements
 
-## Prerequisites
+### Debian package
+- `dpkg-deb`
+- `bash`
+- `sed`
 
-### For Debian/Ubuntu Packaging:
-* `dpkg-deb` (part of `dpkg`)
-* `bash`
-* `sed`
+### Arch package
+- `makepkg` (from `base-devel`)
+- `bash`
+- `sed`
+- Build must run as non-root user.
 
-### For Arch Linux Packaging:
-* `pacman` and `base-devel` package group (provides `makepkg` and `fakeroot`)
-* `bash`
-* Non-root shell execution (`makepkg` strictly forbids running as `root`)
+## Local Build Commands
 
----
-
-## Local Building
-
-### 1. Debian Package (`.deb`)
-
-To build a `.deb` package locally, execute `build_deb.sh` and pass the target version as an argument:
+### Build Debian package
 
 ```bash
 chmod +x build_deb.sh
 ./build_deb.sh 1.0.0-1
 ```
 
-**What the script does:**
-1. Validates the version parameter input.
-2. Constructs a staging directory (`build_staging/`).
-3. Replaces `__DEB_VERSION__` in `DEBIAN/control.template` using `sed` to generate `DEBIAN/control`.
-4. Copies `drcwrapper` to `usr/local/bin/drcwrapper` inside the staging tree.
-5. Enforces standard POSIX executable permissions (`755`).
-6. Executes `dpkg-deb --root-owner-group --build` to create `drcwrapper_1.0.0-1_all.deb`.
-7. Cleans up the temporary staging directory.
+Output example:
 
----
+```text
+drc-wrapper_1.0.0-1_all.deb
+```
 
-### 2. Arch Linux Package (`.pkg.tar.zst`)
+What `build_deb.sh` does:
+1. Validates the version argument.
+2. Creates `build_staging/` with Debian package layout.
+3. Renders `DEBIAN/control` from `DEBIAN/control.template`.
+4. Optionally includes `DEBIAN/postinst` and `DEBIAN/postrm` if present.
+5. Installs `drcwrapper` in `/usr/bin` inside the package.
+6. Installs docs (`README.md`, `BUILD.md`) and license.
+7. Builds package with `dpkg-deb --root-owner-group --build`.
+8. Cleans temporary staging directory.
 
-To build an Arch package locally, execute `build_arch.sh` and pass the target version:
+### Build Arch package
 
 ```bash
 chmod +x build_arch.sh
 ./build_arch.sh 1.0.0
 ```
 
-**What the script does:**
-1. Validates the version parameter input.
-2. Constructs a staging directory (`build_arch_staging/`).
-3. Injects the version number replacing `__PKGVER__` in `Arch/AUR/PKGBUILD.template`.
-4. Runs `makepkg -cd --nodeps` inside the staging folder.
-5. Moves the compiled `drc-wrapper-1.0.0-1-any.pkg.tar.zst` artifact to the repository root.
-6. Cleans up the staging directory.
+Output example:
 
----
+```text
+drc-wrapper-1.0.0-1-any.pkg.tar.zst
+```
 
-## CI/CD Pipeline (GitHub Actions)
+What `build_arch.sh` does:
+1. Validates the version argument.
+2. Creates `build_arch_staging/`.
+3. Renders `PKGBUILD` from `Arch/AUR/PKGBUILD.template`.
+4. Runs `makepkg -cd --nodeps` in staging directory.
+5. Moves generated `.pkg.tar.zst` back to repository root.
+6. Cleans staging directory.
 
-Automated package compilation is managed by `.github/workflows/build-packages.yml`.
+## GitHub Actions Workflows
 
-### Triggers & Version Calculation
+### `.github/workflows/test.yml`
+Single test workflow used both as:
+1. regular CI entrypoint on push/pull_request/manual
+2. reusable workflow via `workflow_call` from package build workflow
 
-The workflow triggers on three events:
-1. **Push to `main` branch:**
-   * Generates dev build artifacts.
-   * Versioning assigned: `1.0.0-dev-1` (`.deb`) and `1.0.0.dev` (`.pkg.tar.zst`).
-2. **Push of Git Tags (`v*`):**
-   * Triggers official release packaging (e.g., tag `v1.0.0` strips the `v` prefix to pass `1.0.0` to the build scripts).
-   * Generates production packages and creates an official **GitHub Release** with the artifacts attached.
-3. **Manual Trigger (`workflow_dispatch`):**
-   * Allows manually specifying a custom version string via the GitHub Actions web interface.
+It performs:
+1. `bash -n drcwrapper`
+2. `shellcheck drcwrapper`
+3. `./drcwrapper -h` and `./drcwrapper --help`
+4. Real end-to-end run with files in `test/`
+5. Output verification in generated `drc_out_*` directory.
 
-### How the Pipeline Works
+### `.github/workflows/build-packages.yml`
+Build and release workflow.
 
-* **Debian Job:**
-  Runs on `ubuntu-latest`, executes `./build_deb.sh <version>`, and uploads the `.deb` file using `actions/upload-artifact@v4`.
-* **Arch Linux Job:**
-  Runs in an official `archlinux:latest` Docker container, creates an unprivileged `builder` user to comply with `makepkg` safety requirements, executes `./build_arch.sh <version>`, and uploads the `.pkg.tar.zst` file.
-* **Release Job (Tags Only):**
-  Downloads both build artifacts and publishes a GitHub Release using `softprops/action-gh-release@v2`.
+Triggers:
+1. push on `main`
+2. push on tags `v*`
+3. manual dispatch with optional version input
 
----
+Jobs:
+1. `test`: runs tests from `test.yml`
+2. `build-deb`: builds `.deb` via `build_deb.sh` and uploads artifact
+3. `build-arch`: builds `.pkg.tar.zst` via `build_arch.sh` and uploads artifact
+4. `release`: on tags only, downloads artifacts and publishes GitHub Release assets
 
-## AUR (Arch User Repository) Publishing
+Version strategy in CI:
+1. Manual dispatch: uses input version.
+2. Tag `vX.Y.Z`: uses `X.Y.Z`.
+3. Push on main: uses development versions (`1.0.0-dev` for Debian path, `1.0.0.dev` for Arch path).
 
-The `Arch/AUR/PKGBUILD.aur` template is dedicated for publishing to the official AUR repository (`https://aur.archlinux.org/drc-wrapper.git`).
+## AUR Publishing
 
-Unlike the CI/CD template, `PKGBUILD.aur` uses remote HTTPS git tagging to pull sources directly from GitHub:
+`Arch/AUR/PKGBUILD.aur` is intended for AUR submissions and uses tagged GitHub source:
 
 ```bash
 source=("${pkgname}::git+https://github.com/danieleperuzzi/drc-wrapper.git#tag=v${pkgver}")
 ```
 
-When releasing a new version on AUR:
-1. Copy `Arch/AUR/PKGBUILD.aur` to your local clone of the AUR git repo.
-2. Update `pkgver` to match the released tag.
-3. Update `.SRCINFO` using `mksrcinfo`.
-4. Commit and push to `aur.archlinux.org`.
+Typical AUR release flow:
+1. Update `pkgver` in `PKGBUILD.aur`.
+2. Regenerate `.SRCINFO` with `makepkg --printsrcinfo > .SRCINFO`.
+3. Commit and push to AUR repository.

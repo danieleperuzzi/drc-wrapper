@@ -95,13 +95,17 @@ Most parameters are derived directly from the official DRC documentation ([http:
 ### Syntax
 
 ```bash
-drcwrapper -l <ms> -u <ms> [OPTIONS] IMPULSE_FILE.wav
+drcwrapper [OPTIONS] IMPULSE_FILE.wav
 ```
 
 ### Example Command
 
 ```bash
-drcwrapper -b 32 -f 44100 -c normal -m ecm8000-44.1KHz.txt -t target_curve.txt -s 40 -e 20000 -g 2 -p 0.85 -l 525 -u 1 -o ./output Right32.wav
+drcwrapper -b 32 -f 44100 -c normal -m test/ecm8000-44.1KHz.txt -t test/target_curve_file_flat -s 40 -e 20000 -g 2 -p 0.85 -l 525 -u 1 test/ImpulseLeft.wav
+```
+
+```bash
+drcwrapper --lower-window 525 --upper-window 1 --output-dir ./build/out test/ImpulseLeft.wav
 ```
 
 ---
@@ -109,30 +113,34 @@ drcwrapper -b 32 -f 44100 -c normal -m ecm8000-44.1KHz.txt -t target_curve.txt -
 ## Command-Line Arguments
 
 ### Required Arguments
-* -l `<ms>`: Lower correction window in milliseconds. Automatically computes dependent window taps.
-* -u `<ms>`: Upper correction window in milliseconds.
+* `IMPULSE_FILE.wav`: Input impulse response WAV file.
+* `-l <ms>`, `--lower-window <ms>`: Lower correction window in milliseconds. Automatically computes dependent window taps.
+* `-u <ms>`, `--upper-window <ms>`: Upper correction window in milliseconds.
 
 ### Optional Arguments
-* -b `<bit_depth>`: Impulse response bit depth. Default is 32 bit, but also 16 bit is good enough to achieve good result.
-* -f `<frequency>`: Operating frequency or sampling rate, it determines impulse response sampling rate, filter sampling rate, and drc configuration file to use. Default is 44100 Hz and it is the one tested in depth. Other untested options are: ```44100, 48000, 88200, 96000```.
-* -c `<preset>`: DRC configuration preset. Normal configuration is a good starting point to tune, insane is intended to be used just to show how sound artifacts are and not in a real scenario use case. Default is erb. Values are: ```minimal, soft, normal, strong, extreme, insane, erb```.
-* -m `<path>`: Microphone compensation file used to correct impulse response before computing. This file follows the same rules explained in [Target curve file example](#target-curve-file-example).
-* -t `<path>`: Target curve file used to manipulate filter in order to achieve the desired result. See [Target curve file example](#target-curve-file-example) for a better explanation.
-* -s `<freq>`: Lower end frequency that your speaker setup can reproduce. If you have a subwoofer consider the range extended. This parameter handles the minimum frequency where peak limiting stage starts to operate in order to prevent amplification and speaker overload. Default is 20 Hz. For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec184](http://drc-fir.sourceforge.net/doc/drc.html#sec184)
-* -e `<freq>`: Higher end frequency that your speaker setup can reproduce. This parameter handles the maximum frequency where peak limiting stage ends to operate in order to prevent amplification and speaker overload. Default is 20000 Hz. For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec185](http://drc-fir.sourceforge.net/doc/drc.html#sec185)
-* -g `<gain>`: Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB. Default is 2. For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec182](http://drc-fir.sourceforge.net/doc/drc.html#sec182)
-* -p `<exp>`: Window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2. Default is 1.
-* -o `<path>`: Add drcwrapper working directory.
+* `-b <bit_depth>`, `--bit-depth <bit_depth>`: Impulse response bit depth. Default is 32.
+* `-f <frequency>`, `--frequency <frequency>`: Operating frequency/sampling rate. Supported values: `44100`, `48000`, `88200`, `96000`. Default is `44100`.
+* `-c <preset>`, `--config <preset>`: DRC configuration preset. Values: `minimal`, `soft`, `normal`, `strong`, `extreme`, `insane`, `erb`. Default is `erb`.
+* `-m <path>`, `--mic-compensation <path>`: Microphone compensation file.
+* `-t <path>`, `--target-curve <path>`: Target curve file.
+* `-s <freq>`, `--start-frequency <freq>`: Lower end frequency reproducible by your speaker setup.
+* `-e <freq>`, `--end-frequency <freq>`: Higher end frequency reproducible by your speaker setup.
+* `-g <gain>`, `--max-gain <gain>`: Maximum gain allowed in correction filter.
+* `-p <exp>`, `--window-exponent <exp>`: Window exponent (typical values: `0.7` to `1.2`, default `1`).
+* `-o <path>`, `--output-dir <path>`: Parent directory where drc-wrapper creates its timestamped working folder.
+* `-h`, `--help`: Show command help.
 
 ---
 
 ## Output Structure
 
-The script automatically generates a timestamped directory (e.g., drc_out_1700000000/) containing:
+The script automatically generates a timestamped output directory (for example `drc_out_1700000000`) containing:
 
-1. 32-bit Float PCM Files: Raw intermediate files generated directly by DRC.
-2. wav/ Subdirectory: Automatically converted 16-bit WAV files ideal for direct import into REW (Room EQ Wizard) or convolution engines:
+1. 32-bit float PCM files generated by DRC.
+2. `wav/` subdirectory with converted 16-bit WAV files, useful for REW and convolution engines:
    * `<filename>`_mic_compensated_impulse_response.wav: Pre-filtered impulse response.
    * `<filename>`.wav: Final generated correction filter.
    * `<filename>`_minimum_phase.wav: Minimum phase response output.
    * `<filename>`_test_convolution.wav: Simulated result of applying the correction filter to the original room impulse response.
+
+If you pass `-o` / `--output-dir`, the timestamped folder is created under the provided parent path.

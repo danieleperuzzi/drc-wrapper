@@ -1,6 +1,7 @@
 name: Test
 
 on:
+  workflow_call:
   push:
     branches:
       - "**"
@@ -36,7 +37,7 @@ jobs:
 
       - name: Real end-to-end execution
         run: |
-          rm -rf out
+          rm -rf out drc_out_*
           ./drcwrapper \
             --mic-compensation test/ecm8000-44.1KHz.txt \
             --target-curve test/target_curve_file_flat \
@@ -47,7 +48,9 @@ jobs:
 
       - name: Verify generated outputs
         run: |
-          test -f out/wav/ImpulseLeft_mic_compensated_impulse_response.wav
-          test -f out/wav/ImpulseLeft.wav
-          test -f out/wav/ImpulseLeft_minimum_phase.wav
-          test -f out/wav/ImpulseLeft_test_convolution.wav
+          latest_out="$(ls -d drc_out_* 2>/dev/null | sort | tail -n 1)"
+          [ -n "$latest_out" ]
+          test -f "$latest_out/wav/ImpulseLeft_mic_compensated_impulse_response.wav"
+          test -f "$latest_out/wav/ImpulseLeft.wav"
+          test -f "$latest_out/wav/ImpulseLeft_minimum_phase.wav"
+          test -f "$latest_out/wav/ImpulseLeft_test_convolution.wav"
