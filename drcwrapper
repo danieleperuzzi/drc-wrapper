@@ -44,29 +44,22 @@ function print_help {
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
- echo "USAGE drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -g [...] -p [...] -l [...] -u [...] IMPULSE" >&2
+ echo "USAGE drcwrapper [OPTIONS] IMPULSE" >&2
  echo >&2
- echo "-b	impulse response bit depth. Default is 32" >&2
- echo "-f	operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
- echo "-c	DRC configuration preset (minimal, soft, normal, strong, extreme, insane, erb)" >&2
- echo "-m	mic compensation file" >&2
- echo "-t	target curve" >&2
- echo "-s	lower end frequency that your speaker can reproduce" >&2
- echo "-e	higher end frequency that your speaker can reproduce" >&2
- echo "-g	Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
- echo "-p	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
- echo "-l	lower correction window in milliseconds" >&2
- echo "-u	upper correction window in milliseconds" >&2
+ echo "-b, --bit-depth		impulse response bit depth. Default is 32" >&2
+ echo "-f, --frequency		operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
+ echo "-c, --config		DRC configuration preset (minimal, soft, normal, strong, extreme, insane, erb)" >&2
+ echo "-m, --mic-compensation	mic compensation file" >&2
+ echo "-t, --target-curve	target curve" >&2
+ echo "-s, --start-frequency	lower end frequency that your speaker can reproduce" >&2
+ echo "-e, --end-frequency	higher end frequency that your speaker can reproduce" >&2
+ echo "-g, --max-gain		Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB." >&2
+ echo "-p, --window-exponent	window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2" >&2
+ echo "-l, --lower-window	lower correction window in milliseconds" >&2
+ echo "-u, --upper-window	upper correction window in milliseconds" >&2
+ echo "-h, --help		show this help" >&2
  echo >&2
 }
-
-function evaluate_help {
- if [ $1 = "-h" -o $1 = "--help" ]; then
-  print_help;
-  exit 1
- fi
-}
-
 
 # $1 is the filename to create
 # $2 is sampling rate
@@ -141,81 +134,151 @@ function calculate_is_pe_upper_window_taps {
 }
 
 
-NUM_ARGS=$#
+if [ $# -eq 0 ]; then
+  print_help
+  exit 1
+fi
 
-case $NUM_ARGS in
- "0")
-     print_help;
-     exit 1
-     ;;
- "1")
-     evaluate_help $1;
-     ;;
-esac
-
-
-# some parameters are set so it is possible to create work directory
-mkdir $OUT_DIR
-
-
-while getopts ":b:f:c:m:t:s:e:g:p:l:u:" OPTIONS; do
-  case $OPTIONS in
-    b)
-      IMPULSE_RESPONSE_BIT_DEPTH=$OPTARG
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -b|--bit-depth)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      IMPULSE_RESPONSE_BIT_DEPTH="$2"
+      shift 2
       ;;
-    f)
-      set_operating_frequency $OPTARG
+    --bit-depth=*)
+      IMPULSE_RESPONSE_BIT_DEPTH="${1#*=}"
+      shift
       ;;
-    c)
-      DRC_CONFIGURATION_FILE_PREFIX=$OPTARG
+    -f|--frequency)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      set_operating_frequency "$2"
+      shift 2
       ;;
-    m)
-      MIC_COMP_FILE=$OPTARG
+    --frequency=*)
+      set_operating_frequency "${1#*=}"
+      shift
       ;;
-    t)
-      TARGET_CURVE=$OPTARG
+    -c|--config)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      DRC_CONFIGURATION_FILE_PREFIX="$2"
+      shift 2
       ;;
-    s)
+    --config=*)
+      DRC_CONFIGURATION_FILE_PREFIX="${1#*=}"
+      shift
+      ;;
+    -m|--mic-compensation)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      MIC_COMP_FILE="$2"
+      shift 2
+      ;;
+    --mic-compensation=*)
+      MIC_COMP_FILE="${1#*=}"
+      shift
+      ;;
+    -t|--target-curve)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      TARGET_CURVE="$2"
+      shift 2
+      ;;
+    --target-curve=*)
+      TARGET_CURVE="${1#*=}"
+      shift
+      ;;
+    -s|--start-frequency)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
       # Start frequency where the reference RMS level used for peak limiting is computed. Default value set to 100 Hz.
       # This value should be set typically to something like an octave above the minimum reproducible frequency of your speakers.
-      START_FREQ=$(calculate_start_freq $OPTARG)
+      START_FREQ=$(calculate_start_freq "$2")
+      shift 2
       ;;
-    e)
+    --start-frequency=*)
+      START_FREQ=$(calculate_start_freq "${1#*=}")
+      shift
+      ;;
+    -e|--end-frequency)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
       # End frequency where the reference RMS level used for peak limiting is computed. Default value set to 10000 Hz.
       # This value should be set typically to something like an octave below the maximum reproducible frequency of your speakers.
-      END_FREQ=$(calculate_end_freq $OPTARG)
+      END_FREQ=$(calculate_end_freq "$2")
+      shift 2
       ;;
-    g)
-      PEAK_LIMITING_MAX_GAIN=$OPTARG
+    --end-frequency=*)
+      END_FREQ=$(calculate_end_freq "${1#*=}")
+      shift
       ;;
-    p)
-      WINDOW_EXPONENT=$OPTARG
+    -g|--max-gain)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      PEAK_LIMITING_MAX_GAIN="$2"
+      shift 2
       ;;
-    l)
-      LOWER_WINDOW_TAPS=$(calculate_window_taps $OPTARG)
-      EP_LOWER_WINDOW_TAPS=$(calculate_ep_lower_window_taps $LOWER_WINDOW_TAPS)
-      IS_PE_LOWER_WINDOW_TAPS=$(calculate_is_pe_lower_window_taps $EP_LOWER_WINDOW_TAPS)
-      IS_PE_UPPER_WINDOW_TAPS=$(calculate_is_pe_upper_window_taps $IS_PE_LOWER_WINDOW_TAPS)
+    --max-gain=*)
+      PEAK_LIMITING_MAX_GAIN="${1#*=}"
+      shift
       ;;
-    u)
-      UPPER_WINDOW_TAPS=$(calculate_window_taps $OPTARG)
+    -p|--window-exponent)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      WINDOW_EXPONENT="$2"
+      shift 2
       ;;
-    :)
-      echo "Error: option ${OPTARG} requires an argument"
+    --window-exponent=*)
+      WINDOW_EXPONENT="${1#*=}"
+      shift
+      ;;
+    -l|--lower-window)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      LOWER_WINDOW_TAPS=$(calculate_window_taps "$2")
+      EP_LOWER_WINDOW_TAPS=$(calculate_ep_lower_window_taps "$LOWER_WINDOW_TAPS")
+      IS_PE_LOWER_WINDOW_TAPS=$(calculate_is_pe_lower_window_taps "$EP_LOWER_WINDOW_TAPS")
+      IS_PE_UPPER_WINDOW_TAPS=$(calculate_is_pe_upper_window_taps "$IS_PE_LOWER_WINDOW_TAPS")
+      shift 2
+      ;;
+    --lower-window=*)
+      LOWER_WINDOW_TAPS=$(calculate_window_taps "${1#*=}")
+      EP_LOWER_WINDOW_TAPS=$(calculate_ep_lower_window_taps "$LOWER_WINDOW_TAPS")
+      IS_PE_LOWER_WINDOW_TAPS=$(calculate_is_pe_lower_window_taps "$EP_LOWER_WINDOW_TAPS")
+      IS_PE_UPPER_WINDOW_TAPS=$(calculate_is_pe_upper_window_taps "$IS_PE_LOWER_WINDOW_TAPS")
+      shift
+      ;;
+    -u|--upper-window)
+      [ -n "$2" ] || { echo "Error: option $1 requires an argument"; echo; print_help; exit 1; }
+      UPPER_WINDOW_TAPS=$(calculate_window_taps "$2")
+      shift 2
+      ;;
+    --upper-window=*)
+      UPPER_WINDOW_TAPS=$(calculate_window_taps "${1#*=}")
+      shift
+      ;;
+    -h|--help)
+      print_help
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "Invalid option: $1"
       echo
-      print_help;
+      print_help
       exit 1
       ;;
-    ?)
-      echo "Invalid option: ${OPTARG}"
-      echo
-      print_help;
-      exit 1
+    *)
+      break
       ;;
   esac
 done
 
-shift $((OPTIND - 1))
+if [ $# -ne 1 ]; then
+  echo "Error: exactly one IMPULSE file is required"
+  echo
+  print_help
+  exit 1
+fi
+
+# some parameters are set so it is possible to create work directory
+mkdir $OUT_DIR
 
 
 # handle cases where a microphone correction is not available or a target curve is not set

@@ -26,7 +26,7 @@ for an easy analysis it is suggested to use REW software
 it is assumed that DRC is compiled and available in the standard PATH.
 
 ## Prerequisites
-In order to get drcwrapper to work it is needed an impulse response of the room used for the listening. Drc is intended to be used with 441000 Hz files but other frequency configuration files are provided but they aren't tested. When exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result.
+In order to get drcwrapper to work it is needed an impulse response of the room used for the listening. Drc is intended to be used with 44100 Hz files but other frequency configuration files are provided but they aren't tested. When exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result.
 
 ## Optional prerequisites
 * **microphone compensation curve:** used to correct distortion caused by the microphone
@@ -76,17 +76,23 @@ Most of the parameters here are derivated from the standard drc [doc](http://drc
 
 ### Example command
 ```bash
-drcwrapper -b [...] -f [...] -c [...] -m [...] -t [...] -s [...] -e [...] -g [...] -p [...] -l [...] -u [...] IMPULSE
+drcwrapper [OPTIONS] IMPULSE
 ```
 
 ```bash
 drcwrapper -b 32 -f 44100 -c normal -m ecm8000-44.1KHz.txt -t target_curve_file -s 40 -e 20000 -g 2 -p 0.85 -l 525 -u 1 Right32.wav
 ```
 
-#### -b
+```bash
+drcwrapper --bit-depth 32 --frequency 44100 --config normal --mic-compensation ecm8000-44.1KHz.txt --target-curve target_curve_file --start-frequency 40 --end-frequency 20000 --max-gain 2 --window-exponent 0.85 --lower-window 525 --upper-window 1 Right32.wav
+```
+
+### Options
+
+#### -b, --bit-depth
 This is the impulse response bit depth. Default is 32 bit but also 16 bit is good enough to achieve good result.
 
-#### -f
+#### -f, --frequency
 Operating frequency or sampling rate, it determines:
 
 * impulse response sampling rate
@@ -100,7 +106,7 @@ default is 44100 Hz and it is the one tested in depth, other **not tested** opti
 * 88200
 * 96000
 
-#### -c
+#### -c, --config
 DRC configuration preset. Normal configuration is a good starting point to tune, insane is intended to be used just to show how sound artifacts are and not in a real scenario use case. Default is erb.
 
 values are:
@@ -113,23 +119,35 @@ values are:
 * insane
 * erb
 
-#### -m
+#### -m, --mic-compensation
 Microphone compensation file used to correct impulse response before computing. This file follows the same rules explained in [Target curve file example](#target-curve-file-example)
 
-#### -t
+#### -t, --target-curve
 Target curve file used to manipulate filter in order to achieve the desiderated result. See [Target curve file example](#target-curve-file-example) for a better explaination.
 
-#### -s
+#### -s, --start-frequency
 Lower end frequency that your speaker setup can reproduce. If you have a subwoofer consider the range extended. This parameter handles the minimum frequency where peak limiting stage starts to operate in order to prevent amplification and speaker overload. Default is 20 Hz.
 
 For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec184](http://drc-fir.sourceforge.net/doc/drc.html#sec184)
 
-#### -e
+#### -e, --end-frequency
 Higher end frequency that your speaker setup can reproduce. This parameter handles the maximum frequency where peak limiting stage ends to operate in order to prevent amplification and speaker overload. Default is 20000 Hz.
 
 For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec185](http://drc-fir.sourceforge.net/doc/drc.html#sec185)
 
-#### -g
+#### -g, --max-gain
 Maximum gain allowed in the correction filter. Peaks in the correction filter amplitude response greater than this value will be compressed to PLMaxGain. Typical values are between 1.2 and 4. A typical value is 2.0, i.e. 6 dB. Default is 2.
 
 For further explanation consult original documentation at [http://drc-fir.sourceforge.net/doc/drc.html#sec182](http://drc-fir.sourceforge.net/doc/drc.html#sec182)
+
+#### -p, --window-exponent
+Window exponent. Increasing it gives higher correction in the midrange. Typical values are between 0.7 and 1.2.
+
+#### -l, --lower-window
+Lower correction window in milliseconds.
+
+#### -u, --upper-window
+Upper correction window in milliseconds.
+
+#### -h, --help
+Show command help.

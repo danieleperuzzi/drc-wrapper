@@ -8,7 +8,7 @@ url="https://github.com/danieleperuzzi/drc-wrapper"
 license=('Apache-2.0')
 depends=('drc' 'sox' 'bc' 'bash')
 makedepends=('git')
-source=("${pkgname}::git+ssh://git@github.com/danieleperuzzi/drc-wrapper.git")
+source=("${pkgname}::git+https://github.com/danieleperuzzi/drc-wrapper.git")
 sha256sums=('SKIP')
 
 package() {

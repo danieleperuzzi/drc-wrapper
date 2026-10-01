@@ -1,0 +1,125 @@
+name: Build Packages
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm bash shellcheck drc sox bc
+
+      - name: Bash syntax check
+        run: bash -n drcwrapper
+
+      - name: Shellcheck
+        run: shellcheck drcwrapper
+
+      - name: Help smoke test
+        run: ./drcwrapper --help
+
+      - name: Real end-to-end execution
+        run: |
+          rm -rf out
+          ./drcwrapper \
+            --mic-compensation test/ecm8000-44.1KHz.txt \
+            --target-curve test/target_curve_file_flat \
+            --window-exponent 0.85 \
+            --lower-window 525 \
+            --upper-window 1 \
+            test/ImpulseLeft.wav
+
+      - name: Verify generated outputs
+        run: |
+          test -f out/wav/ImpulseLeft_mic_compensated_impulse_response.wav
+          test -f out/wav/ImpulseLeft.wav
+          test -f out/wav/ImpulseLeft_minimum_phase.wav
+          test -f out/wav/ImpulseLeft_test_convolution.wav
+
+  build-debian:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute package version
+        id: version
+        run: |
+          VERSION="$(date +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build .deb package
+        run: |
+          PKGROOT="build/deb/drc-wrapper"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          rm -rf "$PKGROOT"
+          mkdir -p "$PKGROOT/DEBIAN"
+          mkdir -p "$PKGROOT/usr/bin"
+          mkdir -p "$PKGROOT/usr/share/doc/drc-wrapper"
+
+          install -m 755 drcwrapper "$PKGROOT/usr/bin/drcwrapper"
+          install -m 644 README.md "$PKGROOT/usr/share/doc/drc-wrapper/README.md"
+          install -m 644 LICENSE "$PKGROOT/usr/share/doc/drc-wrapper/LICENSE"
+
+          cat > "$PKGROOT/DEBIAN/control" << EOF
+          Package: drc-wrapper
+          Version: $VERSION
+          Section: sound
+          Priority: optional
+          Architecture: all
+          Maintainer: Daniele Peruzzi <daniele.peruzzi88@gmail.com>
+          Depends: bash, bc, sox, drc
+          Description: A simple bash wrapper script to ease DRC usage
+           Wrapper script around drc (Digital Room Correction).
+          EOF
+
+          dpkg-deb --build "$PKGROOT" "build/drc-wrapper_${VERSION}_all.deb"
+
+      - name: Upload Debian artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: build/*.deb
+
+  build-arch:
+    runs-on: ubuntu-latest
+    needs: test
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Arch package
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su builder -c "cd '$GITHUB_WORKSPACE/Arch/AUR' && makepkg --noconfirm --nodeps --cleanbuild"
+
+      - name: Upload Arch artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: Arch/AUR/*.pkg.tar.*

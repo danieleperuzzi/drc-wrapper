@@ -1,0 +1,53 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm bash shellcheck drc sox bc
+
+      - name: Bash syntax check
+        run: bash -n drcwrapper
+
+      - name: Shellcheck
+        run: shellcheck drcwrapper
+
+      - name: Help smoke test (short)
+        run: ./drcwrapper -h
+
+      - name: Help smoke test (long)
+        run: ./drcwrapper --help
+
+      - name: Real end-to-end execution
+        run: |
+          rm -rf out
+          ./drcwrapper \
+            --mic-compensation test/ecm8000-44.1KHz.txt \
+            --target-curve test/target_curve_file_flat \
+            --window-exponent 0.85 \
+            --lower-window 525 \
+            --upper-window 1 \
+            test/ImpulseLeft.wav
+
+      - name: Verify generated outputs
+        run: |
+          test -f out/wav/ImpulseLeft_mic_compensated_impulse_response.wav
+          test -f out/wav/ImpulseLeft.wav
+          test -f out/wav/ImpulseLeft_minimum_phase.wav
+          test -f out/wav/ImpulseLeft_test_convolution.wav
