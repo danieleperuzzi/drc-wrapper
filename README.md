@@ -95,7 +95,7 @@ Most parameters are derived directly from the official DRC documentation ([http:
 ### Syntax
 
 ```bash
-drcwrapper [OPTIONS] IMPULSE_FILE.wav
+drcwrapper [OPTIONS] IMPULSE_FILE.wav [IMPULSE_FILE_2.wav ...]
 ```
 
 ### Example Command
@@ -108,12 +108,16 @@ drcwrapper -b 32 -f 44100 -c normal -m test/ecm8000-44.1KHz.txt -t test/target_c
 drcwrapper --lower-window 525 --upper-window 1 --output-dir ./build/out test/ImpulseLeft.wav
 ```
 
+```bash
+drcwrapper --lower-window 525 --upper-window 1 --output-dir ./build/out test/ImpulseLeft.wav /path/to/ImpulseRight.wav
+```
+
 ---
 
 ## Command-Line Arguments
 
 ### Required Arguments
-* `IMPULSE_FILE.wav`: Input impulse response WAV file.
+* `IMPULSE_FILE.wav`: One or more input impulse response WAV files.
 * `-l <ms>`, `--lower-window <ms>`: Lower correction window in milliseconds. Automatically computes dependent window taps.
 * `-u <ms>`, `--upper-window <ms>`: Upper correction window in milliseconds.
 

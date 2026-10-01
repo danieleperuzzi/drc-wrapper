@@ -35,7 +35,7 @@ jobs:
       - name: Help smoke test (long)
         run: ./drcwrapper --help
 
-      - name: Real end-to-end execution
+      - name: Real end-to-end execution (two inputs)
         run: |
           rm -rf out drc_out_*
           ./drcwrapper \
@@ -44,7 +44,8 @@ jobs:
             --window-exponent 0.85 \
             --lower-window 525 \
             --upper-window 1 \
-            test/ImpulseLeft.wav
+            test/ImpulseLeft.wav \
+            test/ImpulseRight.wav
 
       - name: Verify generated outputs
         run: |
@@ -54,3 +55,7 @@ jobs:
           test -f "$latest_out/wav/ImpulseLeft.wav"
           test -f "$latest_out/wav/ImpulseLeft_minimum_phase.wav"
           test -f "$latest_out/wav/ImpulseLeft_test_convolution.wav"
+          test -f "$latest_out/wav/ImpulseRight_mic_compensated_impulse_response.wav"
+          test -f "$latest_out/wav/ImpulseRight.wav"
+          test -f "$latest_out/wav/ImpulseRight_minimum_phase.wav"
+          test -f "$latest_out/wav/ImpulseRight_test_convolution.wav"

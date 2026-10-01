@@ -43,7 +43,7 @@ function print_help {
  echo >&2
  echo "when exporting impulse response please be sure it is a signed integer 32 bit wav to achieve the best result" >&2
  echo >&2
- echo "USAGE drcwrapper [OPTIONS] IMPULSE" >&2
+ echo "USAGE drcwrapper [OPTIONS] IMPULSE [IMPULSE ...]" >&2
  echo >&2
  echo "-b, --bit-depth		impulse response bit depth. Default is 32" >&2
  echo "-f, --frequency		operating frequency. It can be 44100, 48000, 88200 or 96000. Default is 44100" >&2
@@ -297,30 +297,18 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ $# -ne 1 ]; then
-  echo "Error: exactly one IMPULSE file is required"
+if [ $# -lt 1 ]; then
+  echo "Error: at least one IMPULSE file is required"
   echo
   print_help
   exit 1
 fi
-
-# some parameters are set so it is possible to create work directory
-mkdir $OUT_DIR
 
 # check if the required parameters are set before proceeding
 
 # check if the required window taps are set
 if [ -z "$LOWER_WINDOW_TAPS" ] || [ -z "$UPPER_WINDOW_TAPS" ]; then
   echo "Error: the required window taps are not set." >&2
-  exit 1
-fi
-
-# check if the input file is set
-INPUT_FILE=$1
-
-if [ -z "$INPUT_FILE" ]; then
-  echo "Error: missing input file parameter." >&2
-  print_help
   exit 1
 fi
 
@@ -348,69 +336,109 @@ if [ -z "$TARGET_CURVE" ]; then
   print_flat_file "$TARGET_CURVE" "$OPERATING_FREQUENCY"
 fi
 
+function process_impulse {
+  local INPUT_FILE="$1"
+  local BASENAME
+  local IMPULSE_RESPONSE_RAW_FILE
+  local MIC_COMPENSATED_IMPULSE_RESPONSE_FILE
+  local DRC_OUTPUT_FILE
+  local DRC_OUTPUT_MINIMUM_PHASE_FILE
+  local DRC_OUTPUT_TEST_CONVOLUTION_FILE
+  local DRC_CONFIGURATION_FILE
+  local OUTPUT_NAME
+  local WAV_FILENAME
 
-# extract the filename without extension from the input file
-FILENAME=$(basename "$INPUT_FILE" | sed 's/\.[^.]*$//')
+  if [ ! -f "$INPUT_FILE" ]; then
+    echo "Error: input file not found: $INPUT_FILE" >&2
+    return 1
+  fi
 
-IMPULSE_RESPONSE_RAW_FILE="${FILENAME}_${IMPULSE_RESPONSE_RAW_FILE_SUFFIX}.${RAW_EXT}"
-MIC_COMPENSATED_IMPULSE_RESPONSE_FILE="${FILENAME}_${MIC_COMPENSATED_IMPULSE_RESPONSE_SUFFIX}.${RAW_EXT}"
-DRC_OUTPUT_FILE="${FILENAME}.${RAW_EXT}"
-DRC_OUTPUT_MINIMUM_PHASE_FILE="${FILENAME}_${MINIMUM_PHASE_SUFFIX}.${RAW_EXT}"
-DRC_OUTPUT_TEST_CONVOLUTION_FILE="${FILENAME}_${TEST_CONVOLUTION_SUFFIX}.${RAW_EXT}"
-DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FREQUENCY_FOLDER}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
+  BASENAME=$(basename "$INPUT_FILE" | sed 's/\.[^.]*$//')
 
+  IMPULSE_RESPONSE_RAW_FILE="${BASENAME}_${IMPULSE_RESPONSE_RAW_FILE_SUFFIX}.${RAW_EXT}"
+  MIC_COMPENSATED_IMPULSE_RESPONSE_FILE="${BASENAME}_${MIC_COMPENSATED_IMPULSE_RESPONSE_SUFFIX}.${RAW_EXT}"
+  DRC_OUTPUT_FILE="${BASENAME}.${RAW_EXT}"
+  DRC_OUTPUT_MINIMUM_PHASE_FILE="${BASENAME}_${MINIMUM_PHASE_SUFFIX}.${RAW_EXT}"
+  DRC_OUTPUT_TEST_CONVOLUTION_FILE="${BASENAME}_${TEST_CONVOLUTION_SUFFIX}.${RAW_EXT}"
+  DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FREQUENCY_FOLDER}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
 
-# converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
-sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 "${INPUT_FILE}" -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "${OUT_DIR}/${IMPULSE_RESPONSE_RAW_FILE}"
+  # converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
+  sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 "$INPUT_FILE" -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE" || return 1
 
-DRC_ARGS=(
-  "--BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
-  "--MCFilterType=M"
-  "--MCPointsFile=$MIC_COMP_FILE"
-  "--MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE"
-  "--MPWindowExponent=$WINDOW_EXPONENT"
-  "--EPWindowExponent=$WINDOW_EXPONENT"
-  "--RTWindowExponent=$WINDOW_EXPONENT"
-  "--MPLowerWindow=$LOWER_WINDOW_TAPS"
-  "--MPUpperWindow=$UPPER_WINDOW_TAPS"
-  "--EPLowerWindow=$EP_LOWER_WINDOW_TAPS"
-  "--EPUpperWindow=$UPPER_WINDOW_TAPS"
-  "--RTLowerWindow=$LOWER_WINDOW_TAPS"
-  "--RTUpperWindow=$UPPER_WINDOW_TAPS"
-  "--ISPETType=f"
-  "--ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS"
-  "--ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS"
-  "--PLStartFreq=$START_FREQ"
-  "--PLEndFreq=$END_FREQ"
-  "--PLMaxGain=$PEAK_LIMITING_MAX_GAIN"
-  "--PSPointsFile=$TARGET_CURVE"
-  "--PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE"
-  "--MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE"
-  "--TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE"
-  "$DRC_CONFIGURATION_FILE"
-)
+  DRC_ARGS=(
+    "--BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
+    "--MCFilterType=M"
+    "--MCPointsFile=$MIC_COMP_FILE"
+    "--MCOutFile=$OUT_DIR/$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE"
+    "--MPWindowExponent=$WINDOW_EXPONENT"
+    "--EPWindowExponent=$WINDOW_EXPONENT"
+    "--RTWindowExponent=$WINDOW_EXPONENT"
+    "--MPLowerWindow=$LOWER_WINDOW_TAPS"
+    "--MPUpperWindow=$UPPER_WINDOW_TAPS"
+    "--EPLowerWindow=$EP_LOWER_WINDOW_TAPS"
+    "--EPUpperWindow=$UPPER_WINDOW_TAPS"
+    "--RTLowerWindow=$LOWER_WINDOW_TAPS"
+    "--RTUpperWindow=$UPPER_WINDOW_TAPS"
+    "--ISPETType=f"
+    "--ISPELowerWindow=$IS_PE_LOWER_WINDOW_TAPS"
+    "--ISPEUpperWindow=$IS_PE_UPPER_WINDOW_TAPS"
+    "--PLStartFreq=$START_FREQ"
+    "--PLEndFreq=$END_FREQ"
+    "--PLMaxGain=$PEAK_LIMITING_MAX_GAIN"
+    "--PSPointsFile=$TARGET_CURVE"
+    "--PSOutFile=$OUT_DIR/$DRC_OUTPUT_FILE"
+    "--MSOutFile=$OUT_DIR/$DRC_OUTPUT_MINIMUM_PHASE_FILE"
+    "--TCOutFile=$OUT_DIR/$DRC_OUTPUT_TEST_CONVOLUTION_FILE"
+    "$DRC_CONFIGURATION_FILE"
+  )
 
-echo "executing drc..."
+  echo "executing drc for: $INPUT_FILE"
+  echo
+  echo "drc \"${DRC_ARGS[*]}\""
+  echo
+  drc "${DRC_ARGS[@]}" || {
+    rm -f "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
+    return 1
+  }
+
+  DRC_OUTPUT_FILENAMES_ARRAY=($MIC_COMPENSATED_IMPULSE_RESPONSE_FILE $DRC_OUTPUT_FILE $DRC_OUTPUT_MINIMUM_PHASE_FILE $DRC_OUTPUT_TEST_CONVOLUTION_FILE)
+
+  for OUTPUT_NAME in "${DRC_OUTPUT_FILENAMES_ARRAY[@]}"
+  do
+    WAV_FILENAME=$(echo "$OUTPUT_NAME" | sed "s/$RAW_EXT/$WAVE_EXT/")
+
+    # convert all drc output files into 16 bit wav
+    # REW better manages this kind of format
+    sox -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$OUTPUT_NAME" -t wav -e signed-integer -b 16 -r $OPERATING_FREQUENCY -c 1 "$WAV_16_BIT_OUT_DIR/$WAV_FILENAME" || {
+      rm -f "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
+      return 1
+    }
+  done
+
+  echo
+  echo "cleaning..."
+  rm -f "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
+
+  return 0
+}
+
+SUCCESS_COUNT=0
+FAIL_COUNT=0
+
+for INPUT_FILE in "$@"
+do
+  if process_impulse "$INPUT_FILE"; then
+    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+  else
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    echo "Failed processing: $INPUT_FILE" >&2
+  fi
+done
+
 echo
-echo "drc \"${DRC_ARGS[*]}\""
-echo
-drc "${DRC_ARGS[@]}"
+echo "Summary: $SUCCESS_COUNT succeeded, $FAIL_COUNT failed"
+echo "Output directory: $OUT_DIR"
 
-# check if drc command exited with 0 status
-if [ $? -eq 0 ]
-then
-	DRC_OUTPUT_FILENAMES_ARRAY=($MIC_COMPENSATED_IMPULSE_RESPONSE_FILE $DRC_OUTPUT_FILE $DRC_OUTPUT_MINIMUM_PHASE_FILE $DRC_OUTPUT_TEST_CONVOLUTION_FILE)
-
-	for FILENAME in "${DRC_OUTPUT_FILENAMES_ARRAY[@]}"
-	do
-		WAV_FILENAME=$(echo $FILENAME | sed "s/$RAW_EXT/$WAVE_EXT/")
-
-		# convert all drc output files into 16 bit wav
-		# REW better manages this kind of format
-		sox -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$FILENAME" -t wav -e signed-integer -b 16 -r $OPERATING_FREQUENCY -c 1 "$WAV_16_BIT_OUT_DIR/$WAV_FILENAME"
-	done
+if [ $FAIL_COUNT -gt 0 ]; then
+  exit 1
 fi
-
-echo
-echo "cleaning..."
-rm "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
