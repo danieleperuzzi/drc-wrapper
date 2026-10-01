@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o pipefail
+
 # check the environment (Linux, Mac) to find base path where DRC is installed
 case "$(uname -s)" in
 
@@ -113,41 +115,52 @@ function create_output_dir() {
   fi
 }
 
+function require_command {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: required command not found: $1" >&2
+    exit 1
+  fi
+}
+
 # calculate using bc
 function calculate_bc {
-  echo $(echo "$1" | bc)
+  echo "$1" | bc
 }
 
 
 function calculate_start_freq {
-  echo $(calculate_bc "$1 * 2")
+  calculate_bc "$1 * 2"
 }
 
 
 function calculate_end_freq {
-  echo $(calculate_bc "$1 / 2")
+  calculate_bc "$1 / 2"
 }
 
 
 # calculate window taps from milliseconds
 function calculate_window_taps {
-  echo $(calculate_bc "$1 * $OPERATING_FREQUENCY / 500")
+  calculate_bc "$1 * $OPERATING_FREQUENCY / 500"
 }
 
 
 function calculate_ep_lower_window_taps {
-  echo $(calculate_bc "$1 / $A_FACTOR_EP_LOWER_WINDOW")
+  calculate_bc "$1 / $A_FACTOR_EP_LOWER_WINDOW"
 }
 
 
 function calculate_is_pe_lower_window_taps {
-  echo $(calculate_bc "$1 / 2")
+  calculate_bc "$1 / 2"
 }
 
 
 function calculate_is_pe_upper_window_taps {
-  echo $(calculate_bc "$1 * 75 / 100")
+  calculate_bc "$1 * 75 / 100"
 }
+
+require_command sox
+require_command drc
+require_command bc
 
 
 if [ $# -eq 0 ]; then
@@ -347,6 +360,8 @@ function process_impulse {
   local DRC_CONFIGURATION_FILE
   local OUTPUT_NAME
   local WAV_FILENAME
+  local -a DRC_ARGS
+  local -a DRC_OUTPUT_FILENAMES_ARRAY
 
   if [ ! -f "$INPUT_FILE" ]; then
     echo "Error: input file not found: $INPUT_FILE" >&2
@@ -363,7 +378,7 @@ function process_impulse {
   DRC_CONFIGURATION_FILE="${CONFIG_DIR}/${DRC_CONFIGURATION_FREQUENCY_FOLDER}/${DRC_CONFIGURATION_FILE_PREFIX}-${DRC_CONFIGURATION_FILE_FREQUENCY}.${DRC_EXT}"
 
   # converting impulse response from signed integer wave (default REW output format) to raw pcm floating point 32 bit (DRC capable)
-  sox -t wav -e signed-integer -b $IMPULSE_RESPONSE_BIT_DEPTH -r $OPERATING_FREQUENCY -c 1 "$INPUT_FILE" -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE" || return 1
+  sox -t wav -e signed-integer -b "$IMPULSE_RESPONSE_BIT_DEPTH" -r "$OPERATING_FREQUENCY" -c 1 "$INPUT_FILE" -t raw -e floating-point -b 32 -r "$OPERATING_FREQUENCY" -c 1 "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE" || return 1
 
   DRC_ARGS=(
     "--BCInFile=$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
@@ -401,15 +416,20 @@ function process_impulse {
     return 1
   }
 
-  DRC_OUTPUT_FILENAMES_ARRAY=($MIC_COMPENSATED_IMPULSE_RESPONSE_FILE $DRC_OUTPUT_FILE $DRC_OUTPUT_MINIMUM_PHASE_FILE $DRC_OUTPUT_TEST_CONVOLUTION_FILE)
+  DRC_OUTPUT_FILENAMES_ARRAY=(
+    "$MIC_COMPENSATED_IMPULSE_RESPONSE_FILE"
+    "$DRC_OUTPUT_FILE"
+    "$DRC_OUTPUT_MINIMUM_PHASE_FILE"
+    "$DRC_OUTPUT_TEST_CONVOLUTION_FILE"
+  )
 
   for OUTPUT_NAME in "${DRC_OUTPUT_FILENAMES_ARRAY[@]}"
   do
-    WAV_FILENAME=$(echo "$OUTPUT_NAME" | sed "s/$RAW_EXT/$WAVE_EXT/")
+    WAV_FILENAME="${OUTPUT_NAME%.${RAW_EXT}}.${WAVE_EXT}"
 
     # convert all drc output files into 16 bit wav
     # REW better manages this kind of format
-    sox -t raw -e floating-point -b 32 -r $OPERATING_FREQUENCY -c 1 "$OUT_DIR/$OUTPUT_NAME" -t wav -e signed-integer -b 16 -r $OPERATING_FREQUENCY -c 1 "$WAV_16_BIT_OUT_DIR/$WAV_FILENAME" || {
+    sox -t raw -e floating-point -b 32 -r "$OPERATING_FREQUENCY" -c 1 "$OUT_DIR/$OUTPUT_NAME" -t wav -e signed-integer -b 16 -r "$OPERATING_FREQUENCY" -c 1 "$WAV_16_BIT_OUT_DIR/$WAV_FILENAME" || {
       rm -f "$OUT_DIR/$IMPULSE_RESPONSE_RAW_FILE"
       return 1
     }
@@ -439,6 +459,6 @@ echo
 echo "Summary: $SUCCESS_COUNT succeeded, $FAIL_COUNT failed"
 echo "Output directory: $OUT_DIR"
 
-if [ $FAIL_COUNT -gt 0 ]; then
+if [ "$FAIL_COUNT" -gt 0 ]; then
   exit 1
 fi
