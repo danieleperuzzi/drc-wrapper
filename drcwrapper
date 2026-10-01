@@ -425,7 +425,7 @@ function process_impulse {
 
   for OUTPUT_NAME in "${DRC_OUTPUT_FILENAMES_ARRAY[@]}"
   do
-    WAV_FILENAME="${OUTPUT_NAME%.${RAW_EXT}}.${WAVE_EXT}"
+    WAV_FILENAME="${OUTPUT_NAME%."${RAW_EXT}"}.${WAVE_EXT}"
 
     # convert all drc output files into 16 bit wav
     # REW better manages this kind of format
