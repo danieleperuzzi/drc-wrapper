@@ -21,7 +21,21 @@ jobs:
       - name: Install test dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm bash shellcheck drc sox bc
+          pacman -S --noconfirm base-devel git sudo bash shellcheck sox bc
+
+      - name: Install drc from AUR
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          install -d -o builder -g builder /tmp/aur
+          su builder -c '
+            set -e
+            cd /tmp/aur
+            curl -L -o drc.tar.gz https://aur.archlinux.org/cgit/aur.git/snapshot/drc.tar.gz
+            tar -xzf drc.tar.gz
+            cd drc
+            makepkg --noconfirm -si --needed
+          '
 
       - name: Bash syntax check
         run: bash -n drcwrapper
